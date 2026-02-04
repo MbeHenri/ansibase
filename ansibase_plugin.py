@@ -72,7 +72,7 @@ class InventoryModule(BaseInventoryPlugin):
         if super(InventoryModule, self).verify_file(path):
             # base class verifies that file exists
             # and is readable by current user
-            if path.endswith(("inventory.ansibase.yaml", "inventory.ansibase.yml")):
+            if path.endswith(("ansibase.yaml", "ansibase.yml")):
                 valid = True
         return valid
 

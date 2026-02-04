@@ -21,10 +21,10 @@ Base de donnees pour Ansible pour gerer son inventaire ( plugin + base de donnee
 │       ├── init.sql                 # - script sql pour initier ansibase
 │       └── roolback.init.sql        # - script sql pour le supprimer
 ├── ansibase_plugin.py             # plugin d'inventaire pour ansile
-├── example.inventory.ansibase.yml # configuration d'exemple du plugin
+├── example.ansibase.yml # configuration d'exemple du plugin
 ├── inventory.ansibase.py          # script d'inventaire pour ansible
 ├── example.ansibase.ini           # configuration d'exemple du script
 └── requirements.txt
 ```
 
-Les fichiers de configurations `example.inventory.ansibase.yml` et `example.ansibase.ini` doivent etre renonne respectivement par `inventory.ansibase.yml` et `ansibase.ini` pour etre detecte automatiquement.
+Les fichiers de configurations `example.ansibase.yml` et `example.ansibase.ini` doivent etre renonne respectivement par `ansibase.yml` et `ansibase.ini` pour etre detecte automatiquement.
