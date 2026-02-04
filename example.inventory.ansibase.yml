@@ -1,0 +1,14 @@
+# Configuration du plugin ansibase pour l'inventaire d'Ansible
+
+# nom du plugin
+plugin: ansibase_plugin            
+
+# Configuration de la base de données
+host: localhost
+port: 5432
+database: ansible_inventory
+user: ansible
+password: "ansible"
+
+# Clé de chiffrement
+encryption_key: "CLE_CHIFFREMENT"
