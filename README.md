@@ -222,7 +222,7 @@ ansible-playbook -i ansibase.yml deploy.yml --limit mon-serveur
 
 ### Ajouter des donnees dans la base
 
-Vue des hotes dans pgAdmin :
+Vue des hotes avec psql :
 
 ![Hotes dans la base de donnees PostgreSQL](docs/hosts_bd.png)
 
