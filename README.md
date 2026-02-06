@@ -200,6 +200,10 @@ ansible-inventory -i ansibase.yml --list
 ansible-inventory -i ansibase.yml --graph
 ```
 
+Exemple d'arborescence et de ping via le plugin :
+
+![Utilisation du plugin ansibase : arborescence et ping](docs/ansibase_using.png)
+
 **Utiliser le plugin avec une commande Ansible :**
 
 ```bash
@@ -217,6 +221,10 @@ ansible-playbook -i ansibase.yml deploy.yml --limit mon-serveur
 ```
 
 ### Ajouter des donnees dans la base
+
+Vue des hotes dans pgAdmin :
+
+![Hotes dans la base de donnees PostgreSQL](docs/hosts_bd.png)
 
 Exemples d'insertion de donnees via `psql` :
 
