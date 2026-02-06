@@ -244,6 +244,13 @@ VALUES (
     '192.168.1.10'
 );
 
+INSERT INTO ansibase_host_variables (host_id, var_id, var_value)
+VALUES (
+    (SELECT id FROM ansibase_hosts WHERE name = 'raspberry.local'),
+    (SELECT id FROM ansibase_variables WHERE var_key = 'ansible_user'),
+    'mbecode'
+);
+
 -- Definir une variable sensible chiffree pour l'hote
 INSERT INTO ansibase_host_variables (host_id, var_id, var_value_encrypted)
 VALUES (
