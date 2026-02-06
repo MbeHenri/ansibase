@@ -107,7 +107,7 @@ celerybeat.pid
 
 # Environments
 .env
-.venv
+.venv*
 env/
 venv/
 ENV/
@@ -142,4 +142,5 @@ cython_debug/
 .idea
 
 ansibase.ini
-inventory.ansibase.yml
+ansibase.yml
+CLAUDE.md
