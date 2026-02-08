@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    env_file:
+      - api/.env
+    environment:
+      POSTGRES_DB: ${ANSIBASE_DB_NAME:-ansibase}
+      POSTGRES_USER: ${ANSIBASE_DB_USER:-ansibase}
+      POSTGRES_PASSWORD: ${ANSIBASE_DB_PASSWORD:-ansibase}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${ANSIBASE_DB_USER:-ansibase} -d ${ANSIBASE_DB_NAME:-ansibase}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: api/
+    restart: unless-stopped
+    environment:
+      # Base de données
+      ANSIBASE_DB_HOST: db
+      ANSIBASE_DB_NAME: ${ANSIBASE_DB_NAME:-ansibase}
+      ANSIBASE_DB_USER: ${ANSIBASE_DB_USER:-ansibase}
+      ANSIBASE_DB_PASSWORD: ${ANSIBASE_DB_USER:-ansibase}
+
+      # Utilisateur admin par défaut
+      ANSIBASE_ADMIN_USERNAME: ${ANSIBASE_ADMIN_USERNAME-admin}
+      ANSIBASE_ADMIN_PASSWORD: ${ANSIBASE_ADMIN_PASSWORD-admin}
+
+      # Cle de chiffrement pour Ansible
+      ANSIBLE_ENCRYPTION_KEY: ${ANSIBASE_SECRET_KEY}
+
+      # Clé secrète d'ansibase
+      ANSIBASE_SECRET_KEY: ${ANSIBASE_SECRET_KEY}
+
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

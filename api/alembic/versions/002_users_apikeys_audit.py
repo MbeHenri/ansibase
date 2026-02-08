@@ -9,7 +9,7 @@ Données par défaut: utilisateur admin (via env vars)
 
 import os
 from app.utils import generate_key, hash_password
-from app.config import ANSIBASE_SECRET_KEY
+from app.config import settings
 from alembic import op
 
 revision = "002"
@@ -119,7 +119,7 @@ def upgrade() -> None:
     op.execute(
         f"""
         INSERT INTO ansibase_api_keys (user_id, key_hash, key_value_encrypted, key_prefix, name)
-        SELECT id, '{key_hash}', pgp_sym_encrypt('{raw_key}', '{ANSIBASE_SECRET_KEY}'), '{key_prefix}', 'default'
+        SELECT id, '{key_hash}', pgp_sym_encrypt('{raw_key}', '{settings.ANSIBASE_SECRET_KEY}'), '{key_prefix}', 'default'
         FROM ansibase_users
         WHERE username = '{admin_username}'
           AND NOT EXISTS (

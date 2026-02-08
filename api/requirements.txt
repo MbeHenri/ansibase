@@ -2,6 +2,9 @@
 fastapi==0.115.12
 uvicorn[standard]==0.34.2
 
+# Core
+ansibase>=1.0.0
+
 # Base de données
 sqlalchemy==2.0.46
 psycopg2-binary==2.9.11

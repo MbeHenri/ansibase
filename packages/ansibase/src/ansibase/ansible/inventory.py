@@ -13,12 +13,10 @@ from ansibase.builder import InventoryBuilder
 from ansibase.crypto import PgCrypto
 from ansibase.database import Database, DatabaseConfig
 
-sys.path.insert(0, str(Path(__file__).parent))
-
 
 def load_config(config_file: str = "ansibase.ini"):
     """Charge la configuration depuis un fichier INI"""
-    config_path = Path(__file__).parent / config_file
+    config_path = Path(config_file)
 
     if not config_path.exists():
         raise FileNotFoundError(f"Fichier de configuration non trouvé: {config_path}")

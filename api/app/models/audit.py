@@ -9,7 +9,7 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models import Base
+from ansibase.models import Base
 
 
 class AuditLog(Base):

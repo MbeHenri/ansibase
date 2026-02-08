@@ -1,7 +1,7 @@
 # Configuration du plugin ansibase pour l'inventaire d'Ansible
 
 # nom du plugin
-plugin: ansibase_plugin            
+plugin: ansibase_ansible            
 
 # Configuration de la base de données
 host: localhost

@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 DOCUMENTATION = r"""
-    name: ansibase_plugin
+    name: ansibase_ansible
     plugin_type: inventory
     short_description: Inventaire dynamique PostgreSQL pour Ansible
     description:
@@ -47,13 +47,7 @@ from ansible.plugins.inventory import BaseInventoryPlugin
 from ansible.errors import AnsibleParserError
 from ansible.inventory.data import InventoryData
 
-# Ajouter le répertoire parent au path pour importer ansibase
-import sys
-from pathlib import Path
 from typing import Any, Dict
-
-plugin_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(plugin_dir))
 
 from ansibase.database import Database, DatabaseConfig
 from ansibase.crypto import PgCrypto
@@ -62,7 +56,7 @@ from ansibase.builder import InventoryBuilder
 
 class InventoryModule(BaseInventoryPlugin):
 
-    NAME = "ansibase_plugin"
+    NAME = "ansibase_ansible"
 
     def verify_file(self, path: str):
         """

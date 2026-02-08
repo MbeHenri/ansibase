@@ -4,9 +4,6 @@ Configuration de l'application via variables d'environnement
 
 from pydantic_settings import BaseSettings
 
-# cle statique de Ansibase (a modifier pour la production)
-ANSIBASE_SECRET_KEY = "ce60a1d461b228f6cc9c5eddc09d6693743b4750728be5cb720610beeef380c1"
-
 
 class Settings(BaseSettings):
     """Configuration centralisée de l'API ansibase"""
@@ -18,8 +15,12 @@ class Settings(BaseSettings):
     ANSIBASE_DB_USER: str = "ansibase"
     ANSIBASE_DB_PASSWORD: str = "ansibase"
 
-    # Chiffrement (obligatoire, pas de valeur par défaut)
+    # Chiffrement des variables sensibles d'ansible (obligatoire, pas de valeur par défaut)
     ANSIBLE_ENCRYPTION_KEY: str
+
+    # Clé secrète d'ansibase (obligatoire)
+    # Générer avec : python -c "import secrets; print(secrets.token_hex(32))"
+    ANSIBASE_SECRET_KEY: str
 
     # Utilisateur admin par défaut
     ANSIBASE_ADMIN_USERNAME: str = "admin"

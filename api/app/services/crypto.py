@@ -6,14 +6,14 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.crypto import PgCrypto
-from app.config import settings, ANSIBASE_SECRET_KEY
+from ansibase.crypto import PgCrypto
+from app.config import settings
 
 # chiffrement des variables sensibles
 _crypto = PgCrypto(settings.ANSIBLE_ENCRYPTION_KEY)
 
-# chiffrement des cles d'API (cle statique separee)
-_api_key_crypto = PgCrypto(ANSIBASE_SECRET_KEY)
+# chiffrement des cles d'API (cle configuree par l'administrateur)
+_api_key_crypto = PgCrypto(settings.ANSIBASE_SECRET_KEY)
 
 
 def encrypt(session: Session, value: str) -> Optional[bytes]:

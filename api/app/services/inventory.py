@@ -8,8 +8,8 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.builder import InventoryBuilder
-from app.crypto import PgCrypto
+from ansibase.builder import InventoryBuilder
+from ansibase.crypto import PgCrypto
 from app.models import Group
 
 from app.config import settings

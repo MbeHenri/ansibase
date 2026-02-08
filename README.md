@@ -1,57 +1,81 @@
 # ansibase
 
-Systeme d'inventaire dynamique pour Ansible adosse a PostgreSQL. Il permet de centraliser la gestion des hotes, groupes, variables et leurs relations dans une base de donnees, avec support du chiffrement des variables sensibles via pgcrypto et de l'aliasing de variables.
+Systeme d'inventaire dynamique pour Ansible adosse a PostgreSQL, avec une API REST pour la gestion centralisee des hotes, groupes, variables et leurs relations. Supporte le chiffrement des variables sensibles via pgcrypto et l'aliasing de variables.
 
 Deux modes d'integration avec Ansible sont disponibles :
 
-- **Mode plugin** : plugin d'inventaire Ansible (`ansibase_plugin.py`)
-- **Mode script** : script d'inventaire dynamique (`inventory.ansibase.py`)
+- **Mode plugin** : plugin d'inventaire Ansible (`ansibase_ansible`)
+- **Mode script** : commande `ansibase-inventory`
 
 ## Structure du projet
 
 ```txt
 .
-├── ansibase/                       # package Python principal
-│   ├── __init__.py                   # + point d'entree du package (exports publics)
-│   ├── builder.py                    # + construction de l'inventaire Ansible
-│   ├── crypto.py                     # + chiffrement/dechiffrement via pgcrypto
-│   ├── database.py                   # + connexion et gestion de la base de donnees
-│   ├── graph.py                      # + arborescence hierarchique des groupes
-│   ├── requirements.txt              # + dependances du package seul
-│   ├── models/                       # + modeles ORM (SQLAlchemy)
+├── packages/ansibase/                # package Python core (inventaire)
+│   ├── pyproject.toml
+│   └── src/ansibase/
+│       ├── __init__.py
+│       ├── builder.py                  # construction de l'inventaire Ansible
+│       ├── crypto.py                   # chiffrement/dechiffrement via pgcrypto
+│       ├── database.py                 # connexion et gestion de la base de donnees
+│       ├── graph.py                    # arborescence hierarchique des groupes
+│       ├── models/                     # modeles ORM (SQLAlchemy)
+│       │   ├── __init__.py
+│       │   ├── base.py
+│       │   ├── group.py
+│       │   ├── host.py
+│       │   └── variable.py
+│       ├── ansible/                    # integration Ansible (plugin + script)
+│       │   ├── __init__.py
+│       │   ├── ansibase_ansible.py
+│       │   └── inventory.py
+│       └── schemas/                    # schemas SQL
+│           ├── init.sql
+│           └── roolback.init.sql
+├── api/                              # API REST (FastAPI)
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── alembic.ini
+│   ├── .env.example
+│   ├── app/
 │   │   ├── __init__.py
-│   │   ├── base.py                     # - modele de base
-│   │   ├── group.py                    # - modele des groupes
-│   │   ├── host.py                     # - modele des hotes
-│   │   └── variable.py                 # - modele des variables et alias
-│   └── schemas/                      # + schemas SQL
-│       ├── init.sql                    # - creation du schema ansibase
-│       └── roolback.init.sql           # - suppression du schema ansibase
-├── plugins/                        # utilitaires d'integration Ansible
-│   └── ansibase_plugin.py           # + plugin d'inventaire Ansible
-├── inventory.ansibase.py           # script d'inventaire dynamique
-├── ansible.cfg                     # configuration Ansible (activation du plugin)
-├── example.ansibase.yml            # configuration d'exemple pour le plugin
-├── example.ansibase.ini            # configuration d'exemple pour le script
-└── requirements.txt                # dependances completes (package + utils)
+│   │   ├── main.py                     # point d'entree FastAPI
+│   │   ├── config.py                   # configuration (variables d'environnement)
+│   │   ├── database.py                 # session SQLAlchemy
+│   │   ├── utils.py
+│   │   ├── models/                     # modeles User, ApiKey, AuditLog
+│   │   ├── routers/                    # endpoints HTTP
+│   │   ├── schemas/                    # modeles Pydantic
+│   │   ├── services/                   # logique metier
+│   │   └── dependencies/              # auth, pagination, resolution
+│   ├── alembic/                        # migrations de base de donnees
+│   │   └── versions/
+│   │       ├── 001_schema_base.py
+│   │       └── 002_users_apikeys_audit.py
+│   └── tests/                          # tests API (pytest)
+├── docker-compose.yml                # Docker Compose (PostgreSQL + API)
+├── ansible.cfg                       # configuration Ansible
+├── example.ansibase.yml              # configuration d'exemple (mode plugin)
+├── example.ansibase.ini              # configuration d'exemple (mode script)
+├── docs/                             # images de documentation
+│   ├── ansibase_using.png
+│   └── hosts_bd.png
+├── requirements.txt                  # dependances completes (avec Ansible)
+└── LICENSE                           # GPL-3.0
 ```
 
 ## Prerequis
 
 - **Python** 3.12+
 - **PostgreSQL** 12+ avec l'extension `pgcrypto`
-- **psql** (client PostgreSQL) pour initialiser le schema
-
-Pour le mode plugin uniquement :
-
-- **Ansible** 2.18+ (`ansible-core`)
+- **Ansible** 2.18+ (`ansible-core`) — optionnel, uniquement pour l'integration Ansible
 
 ## Installation
 
 ### 1. Cloner le depot
 
 ```bash
-git clone <url-du-depot> ansibase
+git clone https://github.com/MbeHenri/ansibase.git
 cd ansibase
 ```
 
@@ -62,103 +86,190 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3. Installer les dependances
-
-**Package seul** (pour une utilisation en tant que bibliotheque Python, ou avec le script d'inventaire) :
+### 3. Installer le package core
 
 ```bash
-pip install -r ansibase/requirements.txt
+pip install -e packages/ansibase
 ```
 
-**Package + utilitaires Ansible** (plugin et script d'inventaire) :
+Pour inclure le support Ansible (plugin et script d'inventaire) :
 
 ```bash
-pip install -r requirements.txt
+pip install -e "packages/ansibase[ansible]"
 ```
 
-Cela installe en plus les dependances Ansible (`ansible`, `ansible-core`, etc.) necessaires au fonctionnement du plugin d'inventaire.
-
-### 4. Initialiser la base de donnees
-
-Creer la base de donnees et l'utilisateur PostgreSQL si ce n'est pas deja fait :
+### 4. Installer l'API
 
 ```bash
-sudo -u postgres createuser --pwprompt ansible
-sudo -u postgres createdb -O ansible ansible_inventory
+pip install -r api/requirements.txt
 ```
 
-Puis initialiser le schema ansibase :
+### 5. Configurer l'environnement
+
+Copier le fichier d'exemple et l'adapter :
 
 ```bash
-psql -U ansible -d ansible_inventory -f ansibase/schemas/init.sql
+cp api/.env.example api/.env
 ```
 
-Cela cree les tables, index, triggers, vues et insere les donnees par defaut (groupes `all` et `ungrouped`, variables Ansible builtin).
+Editer `api/.env` avec les vrais parametres :
 
-Pour supprimer le schema (rollback) :
+```env
+ANSIBASE_DB_HOST=localhost
+ANSIBASE_DB_PORT=5432
+ANSIBASE_DB_NAME=ansibase
+ANSIBASE_DB_USER=ansibase
+ANSIBASE_DB_PASSWORD=ansibase
 
-```bash
-psql -U ansible -d ansible_inventory -f ansibase/schemas/roolback.init.sql
+ANSIBLE_ENCRYPTION_KEY=votre_cle_de_chiffrement
+ANSIBASE_SECRET_KEY=votre_cle_secrete    # python -c "import secrets; print(secrets.token_hex(32))"
+
+ANSIBASE_ADMIN_USERNAME=admin
+ANSIBASE_ADMIN_PASSWORD=admin
 ```
 
-### 5. Configurer les fichiers
-
-Copier les fichiers de configuration d'exemple et les adapter :
+Pour le mode plugin Ansible, copier egalement :
 
 ```bash
-# Pour le mode script
-cp example.ansibase.ini ansibase.ini
-
-# Pour le mode plugin
 cp example.ansibase.yml ansibase.yml
+# Editer ansibase.yml avec les parametres de connexion
 ```
 
-Editer chaque fichier avec les vrais parametres de connexion a la base de donnees et la cle de chiffrement.
+## Demarrage avec Docker
 
-## Utilisation
-
-### Mode script (`inventory.ansibase.py`)
-
-Le script d'inventaire est un executable autonome qui retourne un JSON compatible avec le protocole d'inventaire dynamique d'Ansible. Il utilise un fichier de configuration INI (`ansibase.ini`).
-
-**Lister l'inventaire complet :**
+Le moyen le plus rapide pour lancer l'ensemble (PostgreSQL + API) :
 
 ```bash
-./inventory.ansibase.py --list
+cp api/.env.example api/.env
+# Editer api/.env avec vos parametres
+
+docker compose up --build
 ```
 
-**Afficher le JSON de maniere lisible :**
+L'API est accessible sur `http://localhost:8000` et la base de donnees sur le port `5432`.
+
+Les migrations Alembic sont appliquees automatiquement au demarrage du conteneur API.
+
+## Demarrage local
+
+### 1. Creer la base de donnees PostgreSQL
 
 ```bash
-./inventory.ansibase.py --list --pretty
+sudo -u postgres createuser --pwprompt ansibase
+sudo -u postgres createdb -O ansibase ansibase
 ```
 
-**Recuperer les variables d'un hote specifique :**
+### 2. Appliquer les migrations
 
 ```bash
-./inventory.ansibase.py --host mon-serveur
+cd api
+alembic upgrade head
+cd ..
 ```
 
-**Utiliser un fichier de configuration personnalise :**
+### 3. Lancer l'API
 
 ```bash
-./inventory.ansibase.py --list --config /chemin/vers/custom.ini
+cd api
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**Utiliser le script avec une commande Ansible :**
+L'API est accessible sur `http://localhost:8000`.
+
+## API REST
+
+Documentation interactive disponible sur :
+
+- **Swagger UI** : `http://localhost:8000/docs`
+- **ReDoc** : `http://localhost:8000/redoc`
+
+### Authentification
+
+Tous les endpoints (sauf `/api/v1/auth/login` et `GET /`) necessitent un token Bearer (cle API).
 
 ```bash
-# Ping de tous les hotes
-ansible all -i inventory.ansibase.py -m ping
-
-# Executer une commande sur un groupe
-ansible webservers -i inventory.ansibase.py -m shell -a "uptime"
-
-# Lancer un playbook
-ansible-playbook -i inventory.ansibase.py site.yml
+# Se connecter pour obtenir une cle API
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "admin"}'
 ```
 
-### Mode plugin (`ansibase_plugin.py`)
+Utiliser la cle API retournee dans les requetes suivantes :
+
+```bash
+curl -H "Authorization: Bearer <api_key>" http://localhost:8000/api/v1/hosts
+```
+
+### Endpoints principaux
+
+| Ressource   | Methode | Endpoint | Description |
+|-------------|---------|----------|-------------|
+| Health      | `GET`   | `/` | Etat de l'API |
+| **Auth**    | `POST`  | `/api/v1/auth/login` | Connexion (username/password) |
+| **Users**   | `CRUD`  | `/api/v1/users` | Gestion des utilisateurs |
+|             | `CRUD`  | `/api/v1/users/{id}/api-keys` | Gestion des cles API |
+| **Hosts**   | `CRUD`  | `/api/v1/hosts` | Gestion des hotes |
+|             | `CRUD`  | `/api/v1/hosts/{id}/groups` | Groupes d'un hote |
+|             | `CRUD`  | `/api/v1/hosts/{id}/variables` | Variables d'un hote |
+| **Groups**  | `CRUD`  | `/api/v1/groups` | Gestion des groupes |
+|             | `CRUD`  | `/api/v1/groups/{id}/variables` | Variables d'un groupe |
+|             | `CRUD`  | `/api/v1/groups/{id}/required-variables` | Variables requises |
+|             | `GET`   | `/api/v1/groups/{id}/hosts` | Hotes d'un groupe |
+| **Variables** | `CRUD` | `/api/v1/variables` | Catalogue de variables |
+|             | `CRUD`  | `/api/v1/variables/{id}/aliases` | Alias de variables |
+| **Inventory** | `GET` | `/api/v1/inventory` | Export inventaire (format Ansible JSON) |
+|             | `GET`   | `/api/v1/inventory/hosts/{hostname}` | Variables d'un hote |
+|             | `GET`   | `/api/v1/inventory/graph` | Arborescence des groupes |
+| **Audit**   | `GET`   | `/api/v1/audit-logs` | Journaux d'audit (superuser) |
+
+> Les identifiants (`{id}`) acceptent aussi bien un ID numerique qu'un nom (hostname, group name, var_key, username).
+
+> Les endpoints de listing supportent la pagination : `?page=1&per_page=50`
+
+### Exemples curl
+
+**Creer un hote :**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/hosts \
+  -H "Authorization: Bearer <api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "web01.example.com", "description": "Serveur web principal"}'
+```
+
+**Ajouter un hote a un groupe :**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/hosts/web01.example.com/groups \
+  -H "Authorization: Bearer <api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"group_id_or_name": "webservers"}'
+```
+
+**Assigner une variable a un hote :**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/hosts/web01.example.com/variables \
+  -H "Authorization: Bearer <api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"var_id_or_key": "ansible_host", "value": "192.168.1.10"}'
+```
+
+**Exporter l'inventaire complet :**
+
+```bash
+curl -H "Authorization: Bearer <api_key>" http://localhost:8000/api/v1/inventory
+```
+
+**Recuperer les groupes sous forme d'arbre :**
+
+```bash
+curl -H "Authorization: Bearer <api_key>" "http://localhost:8000/api/v1/groups?tree=true"
+```
+
+## Integration Ansible
+
+### Mode plugin (`ansibase_ansible`)
 
 Le plugin s'integre nativement dans le systeme de plugins d'Ansible. Il necessite un fichier de configuration YAML (`ansibase.yml`) et que le plugin soit active dans `ansible.cfg`.
 
@@ -166,16 +277,16 @@ Le plugin s'integre nativement dans le systeme de plugins d'Ansible. Il necessit
 
 ```ini
 [defaults]
-inventory_plugins = ./plugins
+inventory_plugins = packages/ansibase/src/ansibase/ansible
 
 [inventory]
-enable_plugins = ansibase_plugin, auto, yaml, ini
+enable_plugins = ansibase_ansible, auto, yaml, ini
 ```
 
 **Configuration de `ansibase.yml`** :
 
 ```yaml
-plugin: ansibase_plugin
+plugin: ansibase_ansible
 
 host: localhost
 port: 5432
@@ -188,39 +299,58 @@ encryption_key: "cle_de_chiffrement"
 
 > Le fichier doit se terminer par `ansibase.yml` ou `ansibase.yaml` pour etre reconnu par le plugin.
 
-**Verifier que le plugin est reconnu :**
+**Utilisation :**
 
 ```bash
+# Verifier que le plugin est reconnu
 ansible-inventory -i ansibase.yml --list
-```
 
-**Afficher l'arborescence de l'inventaire :**
-
-```bash
+# Afficher l'arborescence de l'inventaire
 ansible-inventory -i ansibase.yml --graph
+
+# Ping de tous les hotes
+ansible all -i ansibase.yml -m ping
+
+# Lancer un playbook
+ansible-playbook -i ansibase.yml deploy.yml
 ```
 
 Exemple d'arborescence et de ping via le plugin :
 
 ![Utilisation du plugin ansibase : arborescence et ping](docs/ansibase_using.png)
 
-**Utiliser le plugin avec une commande Ansible :**
+### Mode script (`ansibase-inventory`)
+
+Le script d'inventaire est installe en tant que commande via le package `ansibase`. Il utilise un fichier de configuration INI (`ansibase.ini`).
 
 ```bash
-# Ping de tous les hotes
-ansible all -i ansibase.yml -m ping
-
-# Recuperer les facts d'un groupe
-ansible webservers -i ansibase.yml -m setup
-
-# Lancer un playbook
-ansible-playbook -i ansibase.yml deploy.yml
-
-# Lancer un playbook avec limite sur un hote
-ansible-playbook -i ansibase.yml deploy.yml --limit mon-serveur
+cp example.ansibase.ini ansibase.ini
+# Editer ansibase.ini avec les parametres de connexion
 ```
 
-### Ajouter des donnees dans la base
+**Utilisation :**
+
+```bash
+# Lister l'inventaire complet
+ansibase-inventory --list
+
+# Afficher le JSON de maniere lisible
+ansibase-inventory --list --pretty
+
+# Variables d'un hote specifique
+ansibase-inventory --host mon-serveur
+
+# Fichier de configuration personnalise
+ansibase-inventory --list --config /chemin/vers/custom.ini
+
+# Utiliser avec Ansible
+ansible all -i <(ansibase-inventory --list) -m ping
+ansible-playbook -i <(ansibase-inventory --list) site.yml
+```
+
+## Base de donnees
+
+Les migrations Alembic creent automatiquement le schema avec les donnees par defaut : groupes `all` et `ungrouped`, variables Ansible builtin (`ansible_host`, `ansible_port`, `ansible_user`, `ansible_password`, `ansible_become_password`).
 
 Vue des hotes avec psql :
 
@@ -252,13 +382,6 @@ VALUES (
     '192.168.1.10'
 );
 
-INSERT INTO ansibase_host_variables (host_id, var_id, var_value)
-VALUES (
-    (SELECT id FROM ansibase_hosts WHERE name = 'raspberry.local'),
-    (SELECT id FROM ansibase_variables WHERE var_key = 'ansible_user'),
-    'mbecode'
-);
-
 -- Definir une variable sensible chiffree pour l'hote
 INSERT INTO ansibase_host_variables (host_id, var_id, var_value_encrypted)
 VALUES (
@@ -266,10 +389,11 @@ VALUES (
     (SELECT id FROM ansibase_variables WHERE var_key = 'ansible_password'),
     pgp_sym_encrypt('mot_de_passe_ssh', 'cle_de_chiffrement')
 );
-```
 
-**Consulter le catalogue des variables avec leurs alias :**
-
-```sql
+-- Consulter le catalogue des variables avec leurs alias
 SELECT * FROM ansibase_v_variables_catalog;
 ```
+
+## Licence
+
+Ce projet est distribue sous licence [GPL-3.0](LICENSE).
