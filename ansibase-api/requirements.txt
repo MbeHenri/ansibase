@@ -1,0 +1,21 @@
+# FastAPI
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+
+# Base de données
+sqlalchemy==2.0.46
+psycopg2-binary==2.9.11
+
+# Migrations
+alembic==1.15.2
+
+# Sécurité
+bcrypt==4.3.0
+
+# Configuration
+pydantic-settings==2.9.1
+
+# Tests
+httpx==0.28.1
+pytest==8.3.5
+pytest-asyncio==0.25.3

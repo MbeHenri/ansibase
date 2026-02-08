@@ -10,7 +10,7 @@ from pathlib import Path
 from configparser import ConfigParser
 
 from ansibase.builder import InventoryBuilder
-from ansibase.crypto import AnsibleCrypto
+from ansibase.crypto import PgCrypto
 from ansibase.database import Database, DatabaseConfig
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -51,7 +51,7 @@ def generate_inventory(config):
     """Génère l'inventaire complet"""
     db_config = DatabaseConfig.from_dict(config["database"])
     database = Database(db_config)
-    crypto = AnsibleCrypto(config["encryption"]["key"])
+    crypto = PgCrypto(config["encryption"]["key"])
 
     session = database.get_session()
 

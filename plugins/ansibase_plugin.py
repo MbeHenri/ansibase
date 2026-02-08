@@ -56,7 +56,7 @@ plugin_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(plugin_dir))
 
 from ansibase.database import Database, DatabaseConfig
-from ansibase.crypto import AnsibleCrypto
+from ansibase.crypto import PgCrypto
 from ansibase.builder import InventoryBuilder
 
 
@@ -144,7 +144,7 @@ class InventoryModule(BaseInventoryPlugin):
         # Créer la connexion
         config = DatabaseConfig.from_dict(db_config)
         database = Database(config)
-        crypto = AnsibleCrypto(encryption_key)
+        crypto = PgCrypto(encryption_key)
 
         # Générer l'inventaire
         session = database.get_session()
