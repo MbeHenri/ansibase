@@ -25,13 +25,19 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 
-dependencies = ["SQLAlchemy>=2.0,<3.0", "psycopg2-binary>=2.9,<3.0"]
+dependencies = [
+    "SQLAlchemy>=2.0,<3.0",
+    "psycopg2-binary>=2.9,<3.0",
+    "pyyaml>=6.0",
+    "alembic>=1.12,<2.0",
+]
 
 [project.optional-dependencies]
 ansible = ["ansible-core>=2.15"]
 
 [project.scripts]
 ansibase-inventory = "ansibase.ansible.inventory:main"
+ansibase-db = "ansibase.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/MbeHenri/ansibase.git"
@@ -41,4 +47,4 @@ Repository = "https://github.com/MbeHenri/ansibase.git"
 where = ["src"]
 
 [tool.setuptools.package-data]
-ansibase = ["schemas/*.sql"]
+ansibase = ["migrations/*.py", "migrations/*.mako", "migrations/versions/*.py"]

@@ -16,6 +16,8 @@ Deux modes d'integration avec Ansible sont disponibles :
 │   └── src/ansibase/
 │       ├── __init__.py
 │       ├── builder.py                  # construction de l'inventaire Ansible
+│       ├── cli.py                      # gestion de la base de donnees
+│       ├── config.py                   # detection des configurations (ini, yml)
 │       ├── crypto.py                   # chiffrement/dechiffrement via pgcrypto
 │       ├── database.py                 # connexion et gestion de la base de donnees
 │       ├── graph.py                    # arborescence hierarchique des groupes
@@ -29,9 +31,10 @@ Deux modes d'integration avec Ansible sont disponibles :
 │       │   ├── __init__.py
 │       │   ├── ansibase_ansible.py
 │       │   └── inventory.py
-│       └── schemas/                    # schemas SQL
-│           ├── init.sql
-│           └── roolback.init.sql
+│       └── migrations/                 # migrations de base de donnees
+│           └── versions/
+│               └── 001_schema_base.py
+│
 ├── api/                              # API REST (FastAPI)
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -47,11 +50,10 @@ Deux modes d'integration avec Ansible sont disponibles :
 │   │   ├── routers/                    # endpoints HTTP
 │   │   ├── schemas/                    # modeles Pydantic
 │   │   ├── services/                   # logique metier
-│   │   └── dependencies/              # auth, pagination, resolution
+│   │   └── dependencies/               # auth, pagination, resolution
 │   ├── alembic/                        # migrations de base de donnees
 │   │   └── versions/
-│   │       ├── 001_schema_base.py
-│   │       └── 002_users_apikeys_audit.py
+│   │       └── 001_users_apikeys_audit.py
 │   └── tests/                          # tests API (pytest)
 ├── docker-compose.yml                # Docker Compose (PostgreSQL + API)
 ├── ansible.cfg                       # configuration Ansible
@@ -140,13 +142,13 @@ cp example.ansibase.yml ansibase.yml
 Le moyen le plus rapide pour lancer l'ensemble (PostgreSQL + API) :
 
 ```bash
-cp api/.env.example api/.env
-# Editer api/.env avec vos parametres
+cp api/.env.example .env
+# Editer .env avec vos parametres
 
 docker compose up --build
 ```
 
-L'API est accessible sur `http://localhost:8000` et la base de donnees sur le port `5432`.
+L'API est accessible sur `http://localhost:8000`.
 
 Les migrations Alembic sont appliquees automatiquement au demarrage du conteneur API.
 
@@ -161,9 +163,17 @@ sudo -u postgres createdb -O ansibase ansibase
 
 ### 2. Appliquer les migrations
 
+Uniquement le core
+
+```bash
+ansibase-db upgrade head
+```
+
+Avec l'API
+
 ```bash
 cd api
-alembic upgrade head
+python3 manage_db.py upgrade head
 cd ..
 ```
 
@@ -202,28 +212,27 @@ curl -H "Authorization: Bearer <api_key>" http://localhost:8000/api/v1/hosts
 
 ### Endpoints principaux
 
-| Ressource   | Methode | Endpoint | Description |
-|-------------|---------|----------|-------------|
-| Health      | `GET`   | `/` | Etat de l'API |
-| **Auth**    | `POST`  | `/api/v1/auth/login` | Connexion (username/password) |
-| **Users**   | `CRUD`  | `/api/v1/users` | Gestion des utilisateurs |
-|             | `CRUD`  | `/api/v1/users/{id}/api-keys` | Gestion des cles API |
-| **Hosts**   | `CRUD`  | `/api/v1/hosts` | Gestion des hotes |
-|             | `CRUD`  | `/api/v1/hosts/{id}/groups` | Groupes d'un hote |
-|             | `CRUD`  | `/api/v1/hosts/{id}/variables` | Variables d'un hote |
-| **Groups**  | `CRUD`  | `/api/v1/groups` | Gestion des groupes |
-|             | `CRUD`  | `/api/v1/groups/{id}/variables` | Variables d'un groupe |
-|             | `CRUD`  | `/api/v1/groups/{id}/required-variables` | Variables requises |
-|             | `GET`   | `/api/v1/groups/{id}/hosts` | Hotes d'un groupe |
-| **Variables** | `CRUD` | `/api/v1/variables` | Catalogue de variables |
-|             | `CRUD`  | `/api/v1/variables/{id}/aliases` | Alias de variables |
-| **Inventory** | `GET` | `/api/v1/inventory` | Export inventaire (format Ansible JSON) |
-|             | `GET`   | `/api/v1/inventory/hosts/{hostname}` | Variables d'un hote |
-|             | `GET`   | `/api/v1/inventory/graph` | Arborescence des groupes |
-| **Audit**   | `GET`   | `/api/v1/audit-logs` | Journaux d'audit (superuser) |
+| Ressource     | Methode | Endpoint                                 | Description                             |
+| ------------- | ------- | ---------------------------------------- | --------------------------------------- |
+| Health        | `GET`   | `/`                                      | Etat de l'API                           |
+| **Auth**      | `POST`  | `/api/v1/auth/login`                     | Connexion (username/password)           |
+| **Users**     | `CRUD`  | `/api/v1/users`                          | Gestion des utilisateurs                |
+|               | `CRUD`  | `/api/v1/users/{id}/api-keys`            | Gestion des cles API                    |
+| **Hosts**     | `CRUD`  | `/api/v1/hosts`                          | Gestion des hotes                       |
+|               | `CRUD`  | `/api/v1/hosts/{id}/groups`              | Groupes d'un hote                       |
+|               | `CRUD`  | `/api/v1/hosts/{id}/variables`           | Variables d'un hote                     |
+| **Groups**    | `CRUD`  | `/api/v1/groups`                         | Gestion des groupes                     |
+|               | `CRUD`  | `/api/v1/groups/{id}/variables`          | Variables d'un groupe                   |
+|               | `CRUD`  | `/api/v1/groups/{id}/required-variables` | Variables requises                      |
+|               | `GET`   | `/api/v1/groups/{id}/hosts`              | Hotes d'un groupe                       |
+| **Variables** | `CRUD`  | `/api/v1/variables`                      | Catalogue de variables                  |
+|               | `CRUD`  | `/api/v1/variables/{id}/aliases`         | Alias de variables                      |
+| **Inventory** | `GET`   | `/api/v1/inventory`                      | Export inventaire (format Ansible JSON) |
+|               | `GET`   | `/api/v1/inventory/hosts/{hostname}`     | Variables d'un hote                     |
+|               | `GET`   | `/api/v1/inventory/graph`                | Arborescence des groupes                |
+| **Audit**     | `GET`   | `/api/v1/audit-logs`                     | Journaux d'audit (superuser)            |
 
 > Les identifiants (`{id}`) acceptent aussi bien un ID numerique qu'un nom (hostname, group name, var_key, username).
-
 > Les endpoints de listing supportent la pagination : `?page=1&per_page=50`
 
 ### Exemples curl

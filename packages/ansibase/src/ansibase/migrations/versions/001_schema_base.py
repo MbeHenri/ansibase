@@ -13,7 +13,7 @@ Données par défaut: groupes all/ungrouped, variables builtin ansible_*
 
 from alembic import op
 
-revision = "001"
+revision = "001_init.core"
 down_revision = None
 branch_labels = None
 depends_on = None

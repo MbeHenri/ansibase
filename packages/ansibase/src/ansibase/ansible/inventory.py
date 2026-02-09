@@ -6,43 +6,11 @@ Script d'inventaire dynamique ansibase
 import sys
 import json
 import argparse
-from pathlib import Path
-from configparser import ConfigParser
 
 from ansibase.builder import InventoryBuilder
+from ansibase.config import load_config
 from ansibase.crypto import PgCrypto
 from ansibase.database import Database, DatabaseConfig
-
-
-def load_config(config_file: str = "ansibase.ini"):
-    """Charge la configuration depuis un fichier INI"""
-    config_path = Path(config_file)
-
-    if not config_path.exists():
-        raise FileNotFoundError(f"Fichier de configuration non trouvé: {config_path}")
-
-    parser = ConfigParser()
-    parser.read(config_path)
-
-    # Convertir en dictionnaire
-    config = {
-        "database": {
-            "host": parser.get("database", "host"),
-            "port": parser.getint("database", "port"),
-            "database": parser.get("database", "database"),
-            "user": parser.get("database", "user"),
-            "password": parser.get("database", "password"),
-        },
-        "encryption": {
-            "key": parser.get("encryption", "key"),
-        },
-        "cache": {
-            "enabled": parser.getboolean("cache", "enabled", fallback=True),
-            "ttl": parser.getint("cache", "ttl", fallback=300),
-        },
-    }
-
-    return config
 
 
 def generate_inventory(config):

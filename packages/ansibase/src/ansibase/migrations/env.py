@@ -1,28 +1,15 @@
 """
-Configuration Alembic pour ansibase-api
-Charge l'URL de la base depuis app.config.settings
-
-Note: version_locations est configure par manage_db.py AVANT le chargement
-de ce fichier, car ScriptDirectory est cree avant l'execution de env.py.
+Configuration Alembic pour ansibase (standalone)
+L'URL de la base est injectee par le CLI via config.set_main_option
 """
 
-import sys
-from pathlib import Path
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-# Ajouter le répertoire parent au sys.path pour importer app
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from app.config import settings
-
 # Objet Config Alembic
 config = context.config
-
-# Injecter l'URL de la base depuis les settings
-config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # Configuration du logging
 if config.config_file_name is not None:
@@ -33,7 +20,7 @@ target_metadata = None
 
 
 def run_migrations_offline() -> None:
-    """Migrations en mode offline (génération SQL sans connexion)"""
+    """Migrations en mode offline (generation SQL sans connexion)"""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -47,7 +34,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Migrations en mode online (connexion directe à la base)"""
+    """Migrations en mode online (connexion directe a la base)"""
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

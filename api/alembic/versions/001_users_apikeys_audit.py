@@ -12,10 +12,10 @@ from app.utils import generate_key, hash_password
 from app.config import settings
 from alembic import op
 
-revision = "002"
-down_revision = "001"
+revision = "001_init.api"
+down_revision = None
 branch_labels = None
-depends_on = None
+depends_on = "001_init.core"
 
 
 def upgrade() -> None:
