@@ -38,6 +38,16 @@ builder = InventoryBuilder(session, crypto)
 inventory = builder.build()
 ```
 
+### Script pour gerer la base de donnees
+
+```bash
+# Appliquer les migrations
+ansibase-db --config ansibase.ini upgrade 
+
+# Voir les migrations
+ansibase-inventory --host monserveur --config ansibase.ini
+```
+
 ### Script d'inventaire dynamique
 
 ```bash

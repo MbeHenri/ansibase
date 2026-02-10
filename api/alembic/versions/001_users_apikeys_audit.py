@@ -15,7 +15,7 @@ from alembic import op
 revision = "001_init.api"
 down_revision = None
 branch_labels = None
-depends_on = "001_init.core"
+depends_on = None
 
 
 def upgrade() -> None:

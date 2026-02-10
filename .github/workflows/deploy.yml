@@ -1,0 +1,58 @@
+name: Deploy package and other
+
+on:
+  # 🚀 Ne déclenche ce workflow que sur les push vers la branche "main"
+  push:
+    branches:
+      - main
+env:
+  PIP_ACCESS_TOKEN: ${{ secrets.PIP_ACCESS_TOKEN }}
+
+jobs:
+  check-diff:
+    # Ce job vérifie les fichiers modifiés pour déterminer quels pipelines poursuivre par la suite
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_package: ${{ steps.filter.outputs.package || 'false' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Valeurs par défaut pour les exécutions manuelles (ou autres événements)
+      - name: Check changed files
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        id: filter
+        uses: dorny/paths-filter@v3 # Plugin pour détecter quels fichiers ont été modifiés
+        with:
+          filters: |
+            package:
+              - 'packages/**'     # Surveille le dossier de l'api
+
+  deploy-package:
+    needs: [check-diff] # Attend la sortie du job "check-diff"
+    if: |
+      github.event_name == 'push' && needs.check-diff.outputs.deploy_package == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12" # Spécifie la version de Python à utiliser
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build package
+        run: |
+          python -m build --outdir packages/ansibase
+
+      - name: Publish package to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PIP_ACCESS_TOKEN }}
+        run: |
+          twine upload packages/ansibase/* --repository pypi

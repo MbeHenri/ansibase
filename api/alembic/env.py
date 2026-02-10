@@ -2,8 +2,7 @@
 Configuration Alembic pour ansibase-api
 Charge l'URL de la base depuis app.config.settings
 
-Note: version_locations est configure par manage_db.py AVANT le chargement
-de ce fichier, car ScriptDirectory est cree avant l'execution de env.py.
+Les migrations API sont suivies dans alembic_version_api (separee du core).
 """
 
 import sys
@@ -40,6 +39,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        version_table="alembic_version_api",
     )
 
     with context.begin_transaction():
@@ -55,7 +55,11 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            version_table="alembic_version_api",
+        )
 
         with context.begin_transaction():
             context.run_migrations()

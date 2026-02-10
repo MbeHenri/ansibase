@@ -2,38 +2,67 @@
 """
 Wrapper Alembic pour ansibase-api
 
-Combine les migrations core (package ansibase) et API avant de deleguer
-a la CLI Alembic. Necessite le package ansibase installe.
+Gere les migrations API (ansibase_users, ansibase_api_keys, ansibase_audit_logs)
+dans une table de suivi separee (alembic_version_api).
+
+Verifie que le schema core est initialise avant d'appliquer les migrations API.
 
 Usage (memes arguments que alembic) :
-    python manage_db.py upgrade heads
-    python manage_db.py current
-    python manage_db.py history
-    python manage_db.py downgrade -1
+    python manage-db.py upgrade head
+    python manage-db.py current
+    python manage-db.py history
+    python manage-db.py downgrade -1
 """
 
 import sys
 from pathlib import Path
 
 from alembic.config import Config, CommandLine
+from sqlalchemy import create_engine, text, inspect
+
+
+def check_core_schema(database_url: str) -> None:
+    """Verifie que les migrations core sont appliquees avant de lancer l'API."""
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as conn:
+            table_names = inspect(engine).get_table_names()
+
+            if "alembic_version_core" not in table_names:
+                print(
+                    "ERREUR: le schema core n'est pas initialise.\n"
+                    "Executez d'abord : ansibase-db --config ansibase.ini upgrade",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+            result = conn.execute(text("SELECT version_num FROM alembic_version_core"))
+            versions = {row[0] for row in result}
+
+            if not versions:
+                print(
+                    "ERREUR: aucune migration core appliquee.\n"
+                    "Executez d'abord : ansibase-db --config ansibase.ini upgrade",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+    finally:
+        engine.dispose()
 
 
 def main():
     cli = CommandLine()
 
-    # On affiche l'aide si on a aucun argument
     if len(sys.argv) < 2:
         cli.parser.print_help()
         sys.exit(1)
 
     options = cli.parser.parse_args(sys.argv[1:])
 
-    # On affiche l'aide si pas de sous-commande
     if not hasattr(options, "cmd") or options.cmd is None:
         cli.parser.print_help()
         sys.exit(1)
 
-    # On construit la configuration depuis alembic.ini
     try:
         cfg = Config(
             file_=options.config,
@@ -45,22 +74,14 @@ def main():
         cli.parser.print_help()
         sys.exit(1)
 
-    # on recupere le repertoire des migrations de l'api
-    api_versions_dir = str(Path(__file__).resolve().parent / "alembic" / "versions")
-    try:
-        from ansibase.migrations import VERSIONS_DIR as core_versions_dir
+    # Ajouter le repertoire parent au sys.path pour importer app
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from app.config import settings
 
-        # on separe les deux repertoire avec un point-virgule pour que Alembic les traite comme des emplacements distincts
-        version_locations = f"{core_versions_dir};{api_versions_dir}"
-    except ImportError:
-        # si le package ansibase n'est pas installé, on se contente du repertoire de l'api
-        version_locations = api_versions_dir
-    cfg.set_main_option("version_locations", version_locations)
-
-    # Multi-branches (core + api) : "head" -> "heads" pour couvrir toutes les branches
-    # on change la valeur de options.revision avant de deleguer a la CLI Alembic, qui va ensuite la passer a env.py
-    if hasattr(options, "revision") and options.revision == "head":
-        options.revision = "heads"
+    # Verifier le prerequis core avant upgrade/downgrade
+    cmd_name = options.cmd[0].__name__ if options.cmd else ""
+    if cmd_name in ("upgrade", "downgrade"):
+        check_core_schema(settings.database_url)
 
     cli.run_cmd(cfg, options)
 
