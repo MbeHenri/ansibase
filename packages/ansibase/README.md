@@ -45,7 +45,7 @@ inventory = builder.build()
 ansibase-db --config ansibase.ini upgrade 
 
 # Voir les migrations
-ansibase-inventory --host monserveur --config ansibase.ini
+ansibase-db --config ansibase.ini history
 ```
 
 ### Script d'inventaire dynamique

@@ -3,7 +3,7 @@ fastapi==0.115.12
 uvicorn[standard]==0.34.2
 
 # Core
-ansibase>=1.0.1
+ansibase>=1.0.2
 
 # Base de données
 sqlalchemy==2.0.46

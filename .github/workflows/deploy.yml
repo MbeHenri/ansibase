@@ -48,11 +48,11 @@ jobs:
 
       - name: Build package
         run: |
-          python -m build --outdir packages/ansibase
+          python -m build packages/ansibase
 
       - name: Publish package to PyPI
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PIP_ACCESS_TOKEN }}
         run: |
-          twine upload packages/ansibase/* --repository pypi
+          twine upload packages/ansibase/dist/* --repository pypi
