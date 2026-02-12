@@ -42,10 +42,10 @@ inventory = builder.build()
 
 ```bash
 # Appliquer les migrations
-ansibase-db --config ansibase.ini upgrade 
+ansibase-db upgrade --config ansibase.ini 
 
 # Voir les migrations
-ansibase-db --config ansibase.ini history
+ansibase-db history --config ansibase.ini
 ```
 
 ### Script d'inventaire dynamique
@@ -64,22 +64,23 @@ Ajouter dans `ansible.cfg` :
 
 ```ini
 [defaults]
-inventory_plugins = <chemin_vers_site-packages>/ansibase/ansible
+# ton repertoire des inventaires
+inventory_plugins = ./inventory_plugins
 
 [inventory]
-enable_plugins = ansibase-ansible, auto
+enable_plugins = ansibase_ansible, auto
 ```
 
-`<chemin_vers_site-packages>` peut etre obtenu en utilisant la commande
+cree le lien symbolique du plugin dans votre repertoire des plugins
 
 ```bash
-python -c "from pathlib import Path; import ansibase.ansible; print(Path(ansibase.ansible.__file__).parent.parent.parent)"
+ln -s $(python -c "from pathlib import Path; import ansibase.ansible; print(Path(ansibase.ansible.__file__).parent)")/ansibase_ansible.py inventory_plugins/ansibase_ansible.py
 ```
 
 Puis utiliser avec un fichier `ansibase.yml` :
 
 ```yaml
-plugin: ansibase-ansible
+plugin: ansibase_ansible
 host: localhost
 port: 5432
 database: ansibase

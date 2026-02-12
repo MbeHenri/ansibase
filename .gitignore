@@ -142,6 +142,7 @@ cython_debug/
 .idea
 
 .pypirc
+inventory_plugins
 ansibase.ini
 ansibase.yml
 CLAUDE.md
