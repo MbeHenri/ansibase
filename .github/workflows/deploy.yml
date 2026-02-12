@@ -20,7 +20,7 @@ jobs:
 
       # Valeurs par défaut pour les exécutions manuelles (ou autres événements)
       - name: Check changed files
-        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         id: filter
         uses: dorny/paths-filter@v3 # Plugin pour détecter quels fichiers ont été modifiés
         with:
