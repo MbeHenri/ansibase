@@ -4,7 +4,7 @@ on:
   # 🚀 Ne déclenche ce workflow que sur les push vers la branche "main"
   push:
     branches:
-      - main
+      - master
 env:
   PIP_ACCESS_TOKEN: ${{ secrets.PIP_ACCESS_TOKEN }}
 
