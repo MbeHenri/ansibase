@@ -38,6 +38,16 @@ builder = InventoryBuilder(session, crypto)
 inventory = builder.build()
 ```
 
+### Script de migrations (`ansibase-db`)
+
+```bash
+# Appliquer les migrations
+ansibase-db upgrade --config ansibase.ini
+
+# Voir les migrations
+ansibase-db history --config ansibase.ini
+```
+
 ### CLI de gestion (`ansibase-manage`)
 
 Gestion des hotes, groupes et variables directement depuis le terminal.
@@ -125,16 +135,6 @@ webservers:
 
 ```bash
 ansibase-manage group import inventory.yml
-```
-
-### Script de migrations (`ansibase-db`)
-
-```bash
-# Appliquer les migrations
-ansibase-db upgrade --config ansibase.ini
-
-# Voir les migrations
-ansibase-db history --config ansibase.ini
 ```
 
 ### Script d'inventaire dynamique (`ansibase-inventory`)
