@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ansibase"
-version = "1.0.5"
+version = "1.0.6"
 description = "Inventaire Ansible dynamique avec PostgreSQL"
 readme = "README.md"
 license = "GPL-3.0"

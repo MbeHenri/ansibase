@@ -44,8 +44,7 @@ def main():
     parser.add_argument("--host", metavar="HOSTNAME", help="Variables d'un hôte")
     parser.add_argument(
         "--config",
-        default="ansibase.ini",
-        help="Fichier de configuration INI ou YAML (defaut:ansibase.ini, env: ANSIBASE_CONFIG)",
+        help="Fichier de configuration INI ou YAML (env: ANSIBASE_CONFIG=ansibase.ini)",
     )
     parser.add_argument("--pretty", action="store_true", help="JSON formaté")
 

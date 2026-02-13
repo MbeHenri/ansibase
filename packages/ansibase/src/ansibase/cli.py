@@ -12,8 +12,7 @@ def main():
     parent = argparse.ArgumentParser(add_help=False)
     parent.add_argument(
         "--config",
-        default="ansibase.ini",
-        help="Fichier de configuration INI ou YAML (defaut:ansibase.ini, env: ANSIBASE_CONFIG)",
+        help="Fichier de configuration INI ou YAML (env: ANSIBASE_CONFIG=ansibase.ini)",
     )
 
     parser = argparse.ArgumentParser(
