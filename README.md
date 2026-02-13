@@ -2,364 +2,105 @@
 
 Systeme d'inventaire dynamique pour Ansible adosse a PostgreSQL, avec une API REST pour la gestion centralisee des hotes, groupes, variables et leurs relations. Supporte le chiffrement des variables sensibles via pgcrypto et l'aliasing de variables.
 
-Trois commandes CLI sont fournies :
+## Composants
+
+| Composant                                  | Description                                                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| [`packages/ansibase/`](packages/ansibase/) | Package Python core : constructeur d'inventaire, ORM, chiffrement pgcrypto, hierarchie de groupes, CLI, migrations |
+| [`api/`](api/)                             | API REST FastAPI : CRUD hotes/groupes/variables, export inventaire, auth par cle API, audit                        |
+
+Trois commandes CLI :
 
 - **`ansibase-manage`** : gestion des hotes, groupes et variables (CRUD + import YAML)
-- **`ansibase-db`** : gestion des migrations de base de donnees (Alembic)
+- **`ansibase-db`** : migrations de base de donnees (Alembic)
 - **`ansibase-inventory`** : script d'inventaire dynamique pour Ansible
-
-Deux modes d'integration avec Ansible sont disponibles :
-
-- **Mode plugin** : plugin d'inventaire Ansible (`ansibase_ansible`)
-- **Mode script** : commande `ansibase-inventory`
-
-## Structure du projet
-
-```txt
-.
-├── packages/ansibase/                # package Python core (inventaire)
-│   ├── pyproject.toml
-│   └── src/ansibase/
-│       ├── __init__.py
-│       ├── builder.py                  # construction de l'inventaire Ansible
-│       ├── cli.py                      # CLI ansibase-db (migrations)
-│       ├── config.py                   # detection des configurations (ini, yml)
-│       ├── crypto.py                   # chiffrement/dechiffrement via pgcrypto
-│       ├── database.py                 # connexion et gestion de la base de donnees
-│       ├── graph.py                    # arborescence hierarchique des groupes
-│       ├── models/                     # modeles ORM (SQLAlchemy)
-│       │   ├── __init__.py
-│       │   ├── base.py
-│       │   ├── group.py
-│       │   ├── host.py
-│       │   └── variable.py
-│       ├── manage/                     # CLI ansibase-manage (gestion)
-│       │   ├── __init__.py               # point d'entree Click, AppContext
-│       │   ├── hosts.py                  # sous-commandes host
-│       │   ├── groups.py                 # sous-commandes group
-│       │   ├── variables.py              # sous-commandes var
-│       │   ├── importers.py              # moteur d'import YAML
-│       │   └── utils.py                  # utilitaires (session, resolution, affichage)
-│       ├── ansible/                    # integration Ansible (plugin + script)
-│       │   ├── __init__.py
-│       │   ├── ansibase_ansible.py
-│       │   └── inventory.py
-│       └── migrations/                 # migrations de base de donnees
-│           └── versions/
-│               └── 001_schema_base.py
-│
-├── api/                              # API REST (FastAPI)
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── alembic.ini
-│   ├── .env.example
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py                     # point d'entree FastAPI
-│   │   ├── config.py                   # configuration (variables d'environnement)
-│   │   ├── database.py                 # session SQLAlchemy
-│   │   ├── utils.py
-│   │   ├── models/                     # modeles User, ApiKey, AuditLog
-│   │   ├── routers/                    # endpoints HTTP
-│   │   ├── schemas/                    # modeles Pydantic
-│   │   ├── services/                   # logique metier
-│   │   └── dependencies/               # auth, pagination, resolution
-│   ├── alembic/                        # migrations de base de donnees
-│   │   └── versions/
-│   │       └── 001_users_apikeys_audit.py
-│   └── tests/                          # tests API (pytest)
-├── docker-compose.yml                # Docker Compose (PostgreSQL + API)
-├── ansible.cfg                       # configuration Ansible
-├── example.ansibase.yml              # configuration d'exemple (mode plugin)
-├── example.ansibase.ini              # configuration d'exemple (mode script)
-├── docs/                             # images de documentation
-│   ├── ansibase_using.png
-│   └── hosts_bd.png
-├── requirements.txt                  # dependances completes (avec Ansible)
-└── LICENSE                           # GPL-3.0
-```
 
 ## Prerequis
 
 - **Python** 3.12+
-- **PostgreSQL** 12+ avec l'extension `pgcrypto`
-- **Ansible** 2.18+ (`ansible-core`) — optionnel, uniquement pour l'integration Ansible
+- **PostgreSQL** 12+ avec `pgcrypto`
+- **Ansible** 2.18+ — optionnel, uniquement pour l'integration Ansible
 
-## Installation
+## Demarrage rapide
 
-### 1. Cloner le depot
-
-```bash
-git clone https://github.com/MbeHenri/ansibase.git
-cd ansibase
-```
-
-### 2. Creer un environnement virtuel
+### Avec Docker (recommande)
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-### 3. Installer le package core
-
-```bash
-pip install -e packages/ansibase
-```
-
-Pour inclure le support Ansible (plugin et script d'inventaire) :
-
-```bash
-pip install -e "packages/ansibase[ansible]"
-```
-
-### 4. Installer l'API
-
-```bash
-pip install -r api/requirements.txt
-```
-
-### 5. Configurer l'environnement
-
-Copier le fichier d'exemple et l'adapter :
-
-```bash
-cp api/.env.example api/.env
-```
-
-Editer `api/.env` avec les vrais parametres :
-
-```env
-ANSIBASE_DB_HOST=localhost
-ANSIBASE_DB_PORT=5432
-ANSIBASE_DB_NAME=ansibase
-ANSIBASE_DB_USER=ansibase
-ANSIBASE_DB_PASSWORD=ansibase
-
-ANSIBLE_ENCRYPTION_KEY=votre_cle_de_chiffrement
-ANSIBASE_SECRET_KEY=votre_cle_secrete    # python -c "import secrets; print(secrets.token_hex(32))"
-
-ANSIBASE_ADMIN_USERNAME=admin
-ANSIBASE_ADMIN_PASSWORD=admin
-```
-
-Pour le mode plugin Ansible, copier egalement :
-
-```bash
-cp example.ansibase.yml ansibase.yml
-# Editer ansibase.yml avec les parametres de connexion
-```
-
-## Demarrage avec Docker
-
-Le moyen le plus rapide pour lancer l'ensemble (PostgreSQL + API) :
-
-```bash
+git clone https://github.com/MbeHenri/ansibase.git && cd ansibase
 cp api/.env.example .env
-# Editer .env avec vos parametres
-
+# Editer .env (ANSIBLE_ENCRYPTION_KEY, ANSIBASE_SECRET_KEY)
 docker compose up --build
 ```
 
-L'API est accessible sur `http://localhost:8000`.
+L'API est accessible sur `http://localhost:8000` ([Swagger](http://localhost:8000/docs)).
 
-Les migrations Alembic sont appliquees automatiquement au demarrage du conteneur API.
-
-## Demarrage local
-
-### 1. Creer la base de donnees PostgreSQL
+### En local
 
 ```bash
-sudo -u postgres createuser --pwprompt ansibase
+# Environnement
+python3 -m venv .venv && source .venv/bin/activate
+
+# Package core + support Ansible
+pip install -e "packages/ansibase[ansible]"
+
+# API
+pip install -r api/requirements.txt
+cp api/.env.example api/.env
+# Editer api/.env
+
+# Base de donnees
 sudo -u postgres createdb -O ansibase ansibase
-```
-
-### 2. Appliquer les migrations
-
-Uniquement le core
-
-```bash
 ansibase-db upgrade head
-```
+cd api && python3 manage-db.py upgrade head && cd ..
 
-Avec l'API
-
-```bash
-cd api
-python3 manage-db.py upgrade head
-cd ..
-```
-
-### 3. Lancer l'API
-
-```bash
-cd api
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-L'API est accessible sur `http://localhost:8000`.
-
-## API REST
-
-Documentation interactive disponible sur :
-
-- **Swagger UI** : `http://localhost:8000/docs`
-- **ReDoc** : `http://localhost:8000/redoc`
-
-### Authentification
-
-Tous les endpoints (sauf `/api/v1/auth/login` et `GET /`) necessitent un token Bearer (cle API).
-
-```bash
-# Se connecter pour obtenir une cle API
-curl -X POST http://localhost:8000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "admin"}'
-```
-
-Utiliser la cle API retournee dans les requetes suivantes :
-
-```bash
-curl -H "Authorization: Bearer <api_key>" http://localhost:8000/api/v1/hosts
-```
-
-### Endpoints principaux
-
-| Ressource     | Methode | Endpoint                                 | Description                             |
-| ------------- | ------- | ---------------------------------------- | --------------------------------------- |
-| Health        | `GET`   | `/`                                      | Etat de l'API                           |
-| **Auth**      | `POST`  | `/api/v1/auth/login`                     | Connexion (username/password)           |
-| **Users**     | `CRUD`  | `/api/v1/users`                          | Gestion des utilisateurs                |
-|               | `CRUD`  | `/api/v1/users/{id}/api-keys`            | Gestion des cles API                    |
-| **Hosts**     | `CRUD`  | `/api/v1/hosts`                          | Gestion des hotes                       |
-|               | `CRUD`  | `/api/v1/hosts/{id}/groups`              | Groupes d'un hote                       |
-|               | `CRUD`  | `/api/v1/hosts/{id}/variables`           | Variables d'un hote                     |
-| **Groups**    | `CRUD`  | `/api/v1/groups`                         | Gestion des groupes                     |
-|               | `CRUD`  | `/api/v1/groups/{id}/variables`          | Variables d'un groupe                   |
-|               | `CRUD`  | `/api/v1/groups/{id}/required-variables` | Variables requises                      |
-|               | `GET`   | `/api/v1/groups/{id}/hosts`              | Hotes d'un groupe                       |
-| **Variables** | `CRUD`  | `/api/v1/variables`                      | Catalogue de variables                  |
-|               | `CRUD`  | `/api/v1/variables/{id}/aliases`         | Alias de variables                      |
-| **Inventory** | `GET`   | `/api/v1/inventory`                      | Export inventaire (format Ansible JSON) |
-|               | `GET`   | `/api/v1/inventory/hosts/{hostname}`     | Variables d'un hote                     |
-|               | `GET`   | `/api/v1/inventory/graph`                | Arborescence des groupes                |
-| **Audit**     | `GET`   | `/api/v1/audit-logs`                     | Journaux d'audit (superuser)            |
-
-> Les identifiants (`{id}`) acceptent aussi bien un ID numerique qu'un nom (hostname, group name, var_key, username).
-> Les endpoints de listing supportent la pagination : `?page=1&per_page=50`
-
-### Exemples curl
-
-**Creer un hote :**
-
-```bash
-curl -X POST http://localhost:8000/api/v1/hosts \
-  -H "Authorization: Bearer <api_key>" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "web01.example.com", "description": "Serveur web principal"}'
-```
-
-**Ajouter un hote a un groupe :**
-
-```bash
-curl -X POST http://localhost:8000/api/v1/hosts/web01.example.com/groups \
-  -H "Authorization: Bearer <api_key>" \
-  -H "Content-Type: application/json" \
-  -d '{"group_id_or_name": "webservers"}'
-```
-
-**Assigner une variable a un hote :**
-
-```bash
-curl -X POST http://localhost:8000/api/v1/hosts/web01.example.com/variables \
-  -H "Authorization: Bearer <api_key>" \
-  -H "Content-Type: application/json" \
-  -d '{"var_id_or_key": "ansible_host", "value": "192.168.1.10"}'
-```
-
-**Exporter l'inventaire complet :**
-
-```bash
-curl -H "Authorization: Bearer <api_key>" http://localhost:8000/api/v1/inventory
-```
-
-**Recuperer les groupes sous forme d'arbre :**
-
-```bash
-curl -H "Authorization: Bearer <api_key>" "http://localhost:8000/api/v1/groups?tree=true"
+# Lancer l'API
+cd api && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## CLI de gestion (`ansibase-manage`)
 
-La commande `ansibase-manage` permet de gerer les hotes, groupes et variables directement depuis le terminal. Elle necessite un fichier de configuration (`ansibase.ini` ou `ansibase.yml`).
+Gestion des hotes, groupes et variables depuis le terminal. Necessite un fichier de configuration (`ansibase.ini` ou `ansibase.yml`).
 
 ```bash
-ansibase-manage --help
-ansibase-manage -c /chemin/vers/config.ini host list
-ansibase-manage --json host list   # sortie JSON
+ansibase-manage -c ansibase.ini host list
+ansibase-manage --json group list --tree
 ```
 
-### Hotes (`host`)
+### Commandes disponibles
 
-| Commande                                           | Description                                                                                      |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `ansibase-manage host list`                        | Lister les hotes (filtres : `--active/--inactive`, `--group`, `--search`)                        |
-| `ansibase-manage host show <ref>`                  | Afficher les details d'un hote (info, groupes, variables). `--reveal` pour les valeurs sensibles |
-| `ansibase-manage host create <name>`               | Creer un hote (`--description`, `--inactive`)                                                    |
-| `ansibase-manage host update <ref>`                | Modifier un hote (`--name`, `--description`, `--active/--inactive`)                              |
-| `ansibase-manage host delete <ref>`                | Supprimer un hote (`--yes` pour confirmer)                                                       |
-| `ansibase-manage host add-group <ref> <group>`     | Ajouter un hote a un groupe                                                                      |
-| `ansibase-manage host remove-group <ref> <group>`  | Retirer un hote d'un groupe                                                                      |
-| `ansibase-manage host set-var <ref> <key> <value>` | Assigner une variable a un hote (upsert)                                                         |
-| `ansibase-manage host unset-var <ref> <key>`       | Retirer une variable d'un hote                                                                   |
-| `ansibase-manage host import <fichier.yml>`        | Importer des hotes et variables depuis un fichier YAML                                           |
+**Hotes** (`host`) : `list`, `show`, `create`, `update`, `delete`, `add-group`, `remove-group`, `set-var`, `unset-var`, `import`
 
-> `<ref>` accepte un ID numerique ou un nom d'hote.
+**Groupes** (`group`) : `list`, `show`, `create`, `update`, `delete`, `set-var`, `unset-var`, `import`
 
-### Groupes (`group`)
+**Variables** (`var`) : `list`, `create`, `update`, `delete`
 
-| Commande                                            | Description                                                                                           |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `ansibase-manage group list`                        | Lister les groupes (`--tree` pour l'arborescence)                                                     |
-| `ansibase-manage group show <ref>`                  | Afficher les details d'un groupe. `--inherited` pour les variables heritees et hotes des sous-groupes |
-| `ansibase-manage group create <name>`               | Creer un groupe (`--description`, `--parent`)                                                         |
-| `ansibase-manage group update <ref>`                | Modifier un groupe (`--name`, `--description`, `--parent`)                                            |
-| `ansibase-manage group delete <ref>`                | Supprimer un groupe (`--yes` pour confirmer). Les groupes `all` et `ungrouped` sont proteges          |
-| `ansibase-manage group set-var <ref> <key> <value>` | Assigner une variable a un groupe (upsert)                                                            |
-| `ansibase-manage group unset-var <ref> <key>`       | Retirer une variable d'un groupe                                                                      |
-| `ansibase-manage group import <fichier.yml>`        | Importer des groupes depuis un fichier YAML au format Ansible                                         |
-
-### Variables (`var`)
-
-| Commande                               | Description                                                                           |
-| -------------------------------------- | ------------------------------------------------------------------------------------- |
-| `ansibase-manage var list`             | Lister le catalogue de variables (filtres : `--sensitive`, `--builtin`, `--type`)     |
-| `ansibase-manage var create <var_key>` | Creer une variable (`--description`, `--sensitive`, `--type`, `--default`, `--regex`) |
-| `ansibase-manage var update <ref>`     | Modifier les metadonnees d'une variable                                               |
-| `ansibase-manage var delete <ref>`     | Supprimer une variable (`--force` pour les builtins)                                  |
+> `<ref>` accepte un ID numerique ou un nom. Aide detaillee : `ansibase-manage host --help`
 
 ### Import YAML
 
-#### Import d'hotes (`host import`)
+```bash
+# Importer des hotes avec leurs variables
+ansibase-manage host import hosts.yml
 
-Deux formats sont supportes :
+# Importer un inventaire Ansible (groupes + hotes + variables)
+ansibase-manage group import inventory.yml
 
-**Format A** — hote unique (toutes les valeurs sont des scalaires). Le nom d'hote est deduit du nom de fichier ou specifie via `--name` :
+# Simulation sans modification
+ansibase-manage host import hosts.yml --dry-run
+```
+
+<details>
+<summary>Exemples de fichiers YAML</summary>
+
+**Import d'hotes** — format plat (un hote, hostname deduit du nom de fichier) :
 
 ```yaml
 # web01.yml
 ansible_host: 192.168.1.10
-ansible_port: 22
 ansible_user: deploy
-http_port: 8080
 ```
 
-```bash
-ansibase-manage host import web01.yml              # hostname = "web01"
-ansibase-manage host import web01.yml --name web01.example.com
-```
-
-**Format B** — multi-hotes (chaque cle de premier niveau est un hostname) :
+**Import d'hotes** — format multi-hotes :
 
 ```yaml
 # hosts.yml
@@ -371,14 +112,7 @@ web02.example.com:
   ansible_user: deploy
 ```
 
-```bash
-ansibase-manage host import hosts.yml
-ansibase-manage host import hosts.yml --dry-run    # simulation sans modification
-```
-
-#### Import de groupes (`group import`)
-
-Le format suit le standard Ansible avec `hosts`, `vars` et `children` :
+**Import de groupes** — format inventaire Ansible :
 
 ```yaml
 # inventory.yml
@@ -386,8 +120,6 @@ webservers:
   hosts:
     web01.example.com:
       ansible_host: 192.168.1.10
-    web02.example.com:
-      ansible_host: 192.168.1.11
   vars:
     http_port: 80
   children:
@@ -396,18 +128,44 @@ webservers:
         web01.example.com:
 ```
 
+</details>
+
+## API REST
+
+Documentation interactive : [Swagger UI](http://localhost:8000/docs) | [ReDoc](http://localhost:8000/redoc)
+
+> Voir [`api/README.md`](api/README.md) pour la liste complete des endpoints.
+
 ```bash
-ansibase-manage group import inventory.yml
-ansibase-manage group import inventory.yml --dry-run
+# Obtenir une cle API
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "admin"}'
+
+# Utiliser l'API
+curl -H "Authorization: Bearer <api_key>" http://localhost:8000/api/v1/hosts
+curl -H "Authorization: Bearer <api_key>" http://localhost:8000/api/v1/inventory
 ```
+
+### Endpoints principaux
+
+| Ressource     | Endpoint                  | Description                         |
+| ------------- | ------------------------- | ----------------------------------- |
+| **Auth**      | `POST /api/v1/auth/login` | Connexion, retourne la cle API      |
+| **Hosts**     | `/api/v1/hosts`           | CRUD hotes, groupes et variables    |
+| **Groups**    | `/api/v1/groups`          | CRUD groupes, variables, hierarchie |
+| **Variables** | `/api/v1/variables`       | Catalogue de variables et alias     |
+| **Inventory** | `GET /api/v1/inventory`   | Export inventaire (format Ansible)  |
+| **Users**     | `/api/v1/users`           | Gestion des utilisateurs et cles    |
+| **Audit**     | `GET /api/v1/audit-logs`  | Journaux d'audit (superuser)        |
+
+> Les identifiants acceptent un ID numerique ou un nom. Pagination : `?page=1&per_page=50`
 
 ## Integration Ansible
 
 ### Mode plugin (`ansibase_ansible`)
 
-Le plugin s'integre nativement dans le systeme de plugins d'Ansible. Il necessite un fichier de configuration YAML (`ansibase.yml`) et que le plugin soit active dans `ansible.cfg`.
-
-**Configuration de `ansible.cfg`** (deja fourni dans le depot) :
+Configuration dans `ansible.cfg` (deja fourni) :
 
 ```ini
 [defaults]
@@ -417,115 +175,26 @@ inventory_plugins = packages/ansibase/src/ansibase/ansible
 enable_plugins = ansibase_ansible, auto, yaml, ini
 ```
 
-**Configuration de `ansibase.yml`** :
-
-```yaml
-plugin: ansibase_ansible
-
-host: localhost
-port: 5432
-database: ansible_inventory
-user: ansible
-password: "mot_de_passe"
-
-encryption_key: "cle_de_chiffrement"
-```
-
-> Le fichier doit se terminer par `ansibase.yml` ou `ansibase.yaml` pour etre reconnu par le plugin.
-
-**Utilisation :**
-
 ```bash
-# Verifier que le plugin est reconnu
+cp example.ansibase.yml ansibase.yml
+# Editer ansibase.yml avec les parametres de connexion
+
 ansible-inventory -i ansibase.yml --list
-
-# Afficher l'arborescence de l'inventaire
 ansible-inventory -i ansibase.yml --graph
-
-# Ping de tous les hotes
 ansible all -i ansibase.yml -m ping
-
-# Lancer un playbook
-ansible-playbook -i ansibase.yml deploy.yml
 ```
-
-Exemple d'arborescence et de ping via le plugin :
 
 ![Utilisation du plugin ansibase : arborescence et ping](docs/ansibase_using.png)
 
 ### Mode script (`ansibase-inventory`)
 
-Le script d'inventaire est installe en tant que commande via le package `ansibase`. Il utilise un fichier de configuration INI (`ansibase.ini`).
-
 ```bash
 cp example.ansibase.ini ansibase.ini
-# Editer ansibase.ini avec les parametres de connexion
-```
+# Editer ansibase.ini
 
-**Utilisation :**
-
-```bash
-# Lister l'inventaire complet
 ansibase-inventory --list
-
-# Afficher le JSON de maniere lisible
 ansibase-inventory --list --pretty
-
-# Variables d'un hote specifique
 ansibase-inventory --host mon-serveur
-
-# Fichier de configuration personnalise
-ansibase-inventory --list --config /chemin/vers/custom.ini
-
-# Utiliser avec Ansible
-ansible all -i <(ansibase-inventory --list) -m ping
-ansible-playbook -i <(ansibase-inventory --list) site.yml
-```
-
-## Base de donnees
-
-Les migrations Alembic creent automatiquement le schema avec les donnees par defaut : groupes `all` et `ungrouped`, variables Ansible builtin (`ansible_host`, `ansible_port`, `ansible_user`, `ansible_password`, `ansible_become_password`).
-
-Vue des hotes avec psql :
-
-![Hotes dans la base de donnees PostgreSQL](docs/hosts_bd.png)
-
-Exemples d'insertion de donnees via `psql` :
-
-```sql
--- Creer un groupe
-INSERT INTO ansibase_groups (name, description, parent_id)
-VALUES ('webservers', 'Serveurs web', (SELECT id FROM ansibase_groups WHERE name = 'all'));
-
--- Creer un hote
-INSERT INTO ansibase_hosts (name, description)
-VALUES ('web01.example.com', 'Serveur web principal');
-
--- Associer l'hote au groupe
-INSERT INTO ansibase_host_groups (host_id, group_id)
-VALUES (
-    (SELECT id FROM ansibase_hosts WHERE name = 'web01.example.com'),
-    (SELECT id FROM ansibase_groups WHERE name = 'webservers')
-);
-
--- Definir une variable non sensible pour l'hote
-INSERT INTO ansibase_host_variables (host_id, var_id, var_value)
-VALUES (
-    (SELECT id FROM ansibase_hosts WHERE name = 'web01.example.com'),
-    (SELECT id FROM ansibase_variables WHERE var_key = 'ansible_host'),
-    '192.168.1.10'
-);
-
--- Definir une variable sensible chiffree pour l'hote
-INSERT INTO ansibase_host_variables (host_id, var_id, var_value_encrypted)
-VALUES (
-    (SELECT id FROM ansibase_hosts WHERE name = 'web01.example.com'),
-    (SELECT id FROM ansibase_variables WHERE var_key = 'ansible_password'),
-    pgp_sym_encrypt('mot_de_passe_ssh', 'cle_de_chiffrement')
-);
-
--- Consulter le catalogue des variables avec leurs alias
-SELECT * FROM ansibase_v_variables_catalog;
 ```
 
 ## Licence
