@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ansibase"
-version = "1.0.3"
+version = "1.0.4"
 description = "Inventaire Ansible dynamique avec PostgreSQL"
 readme = "README.md"
 license = "GPL-3.0"
@@ -30,12 +30,14 @@ dependencies = [
     "psycopg2-binary>=2.9,<3.0",
     "pyyaml>=6.0",
     "alembic>=1.12,<2.0",
+    "click>=8.0,<9.0",
 ]
 
 [project.optional-dependencies]
 ansible = ["ansible-core>=2.15"]
 
 [project.scripts]
+ansibase-manage = "ansibase.manage:cli"
 ansibase-inventory = "ansibase.ansible.inventory:main"
 ansibase-db = "ansibase.cli:main"
 

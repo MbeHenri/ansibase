@@ -3,6 +3,7 @@
 Script d'inventaire dynamique ansibase
 """
 
+import os
 import sys
 import json
 import argparse
@@ -42,7 +43,9 @@ def main():
     parser.add_argument("--list", action="store_true", help="Lister tout l'inventaire")
     parser.add_argument("--host", metavar="HOSTNAME", help="Variables d'un hôte")
     parser.add_argument(
-        "--config", default="ansibase.ini", help="Fichier de configuration"
+        "--config",
+        default="ansibase.ini",
+        help="Fichier de configuration INI ou YAML (defaut:ansibase.ini, env: ANSIBASE_CONFIG)",
     )
     parser.add_argument("--pretty", action="store_true", help="JSON formaté")
 
@@ -53,7 +56,8 @@ def main():
         sys.exit(1)
 
     try:
-        config = load_config(args.config)
+        config_file = args.config or os.environ.get("ANSIBASE_CONFIG", "ansibase.ini")
+        config = load_config(config_file)
 
         if args.list:
             result = generate_inventory(config)

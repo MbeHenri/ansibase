@@ -2,6 +2,12 @@
 
 Systeme d'inventaire dynamique pour Ansible adosse a PostgreSQL, avec une API REST pour la gestion centralisee des hotes, groupes, variables et leurs relations. Supporte le chiffrement des variables sensibles via pgcrypto et l'aliasing de variables.
 
+Trois commandes CLI sont fournies :
+
+- **`ansibase-manage`** : gestion des hotes, groupes et variables (CRUD + import YAML)
+- **`ansibase-db`** : gestion des migrations de base de donnees (Alembic)
+- **`ansibase-inventory`** : script d'inventaire dynamique pour Ansible
+
 Deux modes d'integration avec Ansible sont disponibles :
 
 - **Mode plugin** : plugin d'inventaire Ansible (`ansibase_ansible`)
@@ -16,7 +22,7 @@ Deux modes d'integration avec Ansible sont disponibles :
 │   └── src/ansibase/
 │       ├── __init__.py
 │       ├── builder.py                  # construction de l'inventaire Ansible
-│       ├── cli.py                      # gestion de la base de donnees
+│       ├── cli.py                      # CLI ansibase-db (migrations)
 │       ├── config.py                   # detection des configurations (ini, yml)
 │       ├── crypto.py                   # chiffrement/dechiffrement via pgcrypto
 │       ├── database.py                 # connexion et gestion de la base de donnees
@@ -27,6 +33,13 @@ Deux modes d'integration avec Ansible sont disponibles :
 │       │   ├── group.py
 │       │   ├── host.py
 │       │   └── variable.py
+│       ├── manage/                     # CLI ansibase-manage (gestion)
+│       │   ├── __init__.py               # point d'entree Click, AppContext
+│       │   ├── hosts.py                  # sous-commandes host
+│       │   ├── groups.py                 # sous-commandes group
+│       │   ├── variables.py              # sous-commandes var
+│       │   ├── importers.py              # moteur d'import YAML
+│       │   └── utils.py                  # utilitaires (session, resolution, affichage)
 │       ├── ansible/                    # integration Ansible (plugin + script)
 │       │   ├── __init__.py
 │       │   ├── ansibase_ansible.py
@@ -173,7 +186,7 @@ Avec l'API
 
 ```bash
 cd api
-python3 manage_db.py upgrade head
+python3 manage-db.py upgrade head
 cd ..
 ```
 
@@ -274,6 +287,118 @@ curl -H "Authorization: Bearer <api_key>" http://localhost:8000/api/v1/inventory
 
 ```bash
 curl -H "Authorization: Bearer <api_key>" "http://localhost:8000/api/v1/groups?tree=true"
+```
+
+## CLI de gestion (`ansibase-manage`)
+
+La commande `ansibase-manage` permet de gerer les hotes, groupes et variables directement depuis le terminal. Elle necessite un fichier de configuration (`ansibase.ini` ou `ansibase.yml`).
+
+```bash
+ansibase-manage --help
+ansibase-manage -c /chemin/vers/config.ini host list
+ansibase-manage --json host list   # sortie JSON
+```
+
+### Hotes (`host`)
+
+| Commande                                           | Description                                                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `ansibase-manage host list`                        | Lister les hotes (filtres : `--active/--inactive`, `--group`, `--search`)                        |
+| `ansibase-manage host show <ref>`                  | Afficher les details d'un hote (info, groupes, variables). `--reveal` pour les valeurs sensibles |
+| `ansibase-manage host create <name>`               | Creer un hote (`--description`, `--inactive`)                                                    |
+| `ansibase-manage host update <ref>`                | Modifier un hote (`--name`, `--description`, `--active/--inactive`)                              |
+| `ansibase-manage host delete <ref>`                | Supprimer un hote (`--yes` pour confirmer)                                                       |
+| `ansibase-manage host add-group <ref> <group>`     | Ajouter un hote a un groupe                                                                      |
+| `ansibase-manage host remove-group <ref> <group>`  | Retirer un hote d'un groupe                                                                      |
+| `ansibase-manage host set-var <ref> <key> <value>` | Assigner une variable a un hote (upsert)                                                         |
+| `ansibase-manage host unset-var <ref> <key>`       | Retirer une variable d'un hote                                                                   |
+| `ansibase-manage host import <fichier.yml>`        | Importer des hotes et variables depuis un fichier YAML                                           |
+
+> `<ref>` accepte un ID numerique ou un nom d'hote.
+
+### Groupes (`group`)
+
+| Commande                                            | Description                                                                                           |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `ansibase-manage group list`                        | Lister les groupes (`--tree` pour l'arborescence)                                                     |
+| `ansibase-manage group show <ref>`                  | Afficher les details d'un groupe. `--inherited` pour les variables heritees et hotes des sous-groupes |
+| `ansibase-manage group create <name>`               | Creer un groupe (`--description`, `--parent`)                                                         |
+| `ansibase-manage group update <ref>`                | Modifier un groupe (`--name`, `--description`, `--parent`)                                            |
+| `ansibase-manage group delete <ref>`                | Supprimer un groupe (`--yes` pour confirmer). Les groupes `all` et `ungrouped` sont proteges          |
+| `ansibase-manage group set-var <ref> <key> <value>` | Assigner une variable a un groupe (upsert)                                                            |
+| `ansibase-manage group unset-var <ref> <key>`       | Retirer une variable d'un groupe                                                                      |
+| `ansibase-manage group import <fichier.yml>`        | Importer des groupes depuis un fichier YAML au format Ansible                                         |
+
+### Variables (`var`)
+
+| Commande                               | Description                                                                           |
+| -------------------------------------- | ------------------------------------------------------------------------------------- |
+| `ansibase-manage var list`             | Lister le catalogue de variables (filtres : `--sensitive`, `--builtin`, `--type`)     |
+| `ansibase-manage var create <var_key>` | Creer une variable (`--description`, `--sensitive`, `--type`, `--default`, `--regex`) |
+| `ansibase-manage var update <ref>`     | Modifier les metadonnees d'une variable                                               |
+| `ansibase-manage var delete <ref>`     | Supprimer une variable (`--force` pour les builtins)                                  |
+
+### Import YAML
+
+#### Import d'hotes (`host import`)
+
+Deux formats sont supportes :
+
+**Format A** — hote unique (toutes les valeurs sont des scalaires). Le nom d'hote est deduit du nom de fichier ou specifie via `--name` :
+
+```yaml
+# web01.yml
+ansible_host: 192.168.1.10
+ansible_port: 22
+ansible_user: deploy
+http_port: 8080
+```
+
+```bash
+ansibase-manage host import web01.yml              # hostname = "web01"
+ansibase-manage host import web01.yml --name web01.example.com
+```
+
+**Format B** — multi-hotes (chaque cle de premier niveau est un hostname) :
+
+```yaml
+# hosts.yml
+web01.example.com:
+  ansible_host: 192.168.1.10
+  ansible_user: deploy
+web02.example.com:
+  ansible_host: 192.168.1.11
+  ansible_user: deploy
+```
+
+```bash
+ansibase-manage host import hosts.yml
+ansibase-manage host import hosts.yml --dry-run    # simulation sans modification
+```
+
+#### Import de groupes (`group import`)
+
+Le format suit le standard Ansible avec `hosts`, `vars` et `children` :
+
+```yaml
+# inventory.yml
+webservers:
+  hosts:
+    web01.example.com:
+      ansible_host: 192.168.1.10
+    web02.example.com:
+      ansible_host: 192.168.1.11
+  vars:
+    http_port: 80
+  children:
+    frontend:
+      hosts:
+        web01.example.com:
+```
+
+```bash
+ansibase-manage group import inventory.yml
+ansibase-manage group import inventory.yml --dry-run
 ```
 
 ## Integration Ansible

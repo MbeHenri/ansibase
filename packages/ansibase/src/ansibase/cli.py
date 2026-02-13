@@ -1,5 +1,6 @@
 """CLI ansibase-db : gestion des migrations de base de donnees"""
 
+import os
 import sys
 import argparse
 
@@ -12,7 +13,7 @@ def main():
     parent.add_argument(
         "--config",
         default="ansibase.ini",
-        help="Fichier de configuration INI ou YML (defaut: ansibase.ini)",
+        help="Fichier de configuration INI ou YAML (defaut:ansibase.ini, env: ANSIBASE_CONFIG)",
     )
 
     parser = argparse.ArgumentParser(
@@ -30,7 +31,9 @@ def main():
     down.add_argument("--revision", required=True, help="Revision cible")
 
     sub.add_parser("current", parents=[parent], help="Afficher la revision courante")
-    sub.add_parser("history", parents=[parent], help="Afficher l'historique des migrations")
+    sub.add_parser(
+        "history", parents=[parent], help="Afficher l'historique des migrations"
+    )
 
     args = parser.parse_args()
     if not args.command:
@@ -38,7 +41,8 @@ def main():
         sys.exit(1)
 
     # Charger la config et construire l'URL
-    config = load_config(args.config)
+    config_file = args.config or os.environ.get("ANSIBASE_CONFIG", "ansibase.ini")
+    config = load_config(config_file)
     db = config["database"]
     url = (
         f"postgresql://{db['user']}:{db['password']}"
