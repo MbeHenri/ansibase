@@ -1,4 +1,5 @@
 # ansibase
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/MbeHenri/ansibase)
 
 Systeme d'inventaire dynamique pour Ansible adosse a PostgreSQL, avec une API REST pour la gestion centralisee des hotes, groupes, variables et leurs relations. Supporte le chiffrement des variables sensibles via pgcrypto et l'aliasing de variables.
 
